@@ -5,7 +5,8 @@ import { coordinatesSchema } from '../../shared/contracts.js';
 import { postJson, ProviderError, type Fetch } from './http.js';
 
 const duration = z.string().regex(/^\d+(?:\.\d+)?s$/);
-const money = z.object({ currencyCode: z.string(), units: z.string().optional(), nanos: z.number().optional() });
+// Google can return transitFare: {} when no fare is available.
+const money = z.object({ currencyCode: z.string().optional(), units: z.string().optional(), nanos: z.number().optional() });
 const point = z.object({ latLng: coordinatesSchema.optional() });
 const stop = z.object({ name: z.string().optional() });
 const transit = z.object({
@@ -65,9 +66,9 @@ export function normalizeRoute(raw: z.infer<typeof googleRoute>, mode: Mode, inp
   const walkingKnown = rawSteps.length > 0 && rawSteps.every(s => s.travelMode && (s.travelMode !== 'WALK' || s.staticDuration !== undefined));
   const walking = mode === 'WALK' ? minutes(raw.duration) : mode === 'DRIVE' || mode === 'BICYCLE' ? 0 : walkingKnown ? rawSteps.filter(s => s.travelMode === 'WALK').reduce((a, s) => a + minutes(s.staticDuration), 0) : null;
   const fare = raw.travelAdvisory?.transitFare;
-  const fareAmount = fare ? Number(fare.units ?? 0) + (fare.nanos ?? 0) / 1e9 : null;
+  const fareAmount = fare && (fare.units !== undefined || fare.nanos !== undefined) ? Number(fare.units ?? 0) + (fare.nanos ?? 0) / 1e9 : null;
   const free = mode === 'WALK' || mode === 'BICYCLE';
-  const cost: Route['cost'] = free ? { amount: 0, currency: 'USD', kind: 'no_fare', complete: true, note: 'No ticket cost; assumes your own bicycle when cycling.' } : fare && fareAmount !== null && Number.isFinite(fareAmount) && fareAmount >= 0 ? {
+  const cost: Route['cost'] = free ? { amount: 0, currency: 'USD', kind: 'no_fare', complete: true, note: 'No ticket cost; assumes your own bicycle when cycling.' } : fare?.currencyCode && fareAmount !== null && Number.isFinite(fareAmount) && fareAmount >= 0 ? {
     amount: Math.round(fareAmount * 100) / 100, currency: fare.currencyCode, kind: 'provider_fare', complete: true, note: 'Fare returned by Google Routes; confirm with the operator.',
   } : { amount: null, currency: 'USD', kind: 'unknown', complete: false, note: mode === 'DRIVE' ? 'Fuel, tolls, and parking costs are not available.' : 'The provider did not return a transit fare.' };
   let departureTime: string | null = null;

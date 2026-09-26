@@ -6,6 +6,8 @@ TypeScript + Fastify API for the RouteWise student trip planner. Runs independen
 
 On the computer where this was created, `./Start-RouteWise.ps1` uses the available bundled Node runtime and pnpm. No system-wide installation is needed.
 
+If PowerShell blocks `.ps1` scripts, run `.\Start-RouteWise.cmd` from the backend folder instead. This launcher compiles and starts the backend using the installed dependencies without changing PowerShell execution policy. Stop an existing server on port 3001 before starting another copy.
+
 On another computer, install Node.js 24 and pnpm 11, then:
 
 ```sh

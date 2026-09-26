@@ -41,6 +41,12 @@ describe('provider protocol and normalization', () => {
     const routes = await new GoogleProvider(config, fetcher).routes(input, 'TRANSIT');
     expect(routes[0].cost.amount).toBeNull(); expect(routes[0].walkingMinutes).toBeNull();
   });
+  it.each([{}, { currencyCode: 'USD' }, { units: '2' }])('keeps transit routes with an empty or incomplete fare without assuming they are free', async transitFare => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ routes: [{ duration: '600s', legs: [{}], travelAdvisory: { transitFare } }] }));
+    const routes = await new GoogleProvider(config, fetcher).routes(input, 'TRANSIT');
+    expect(routes).toHaveLength(1);
+    expect(routes[0].cost).toMatchObject({ amount: null, kind: 'unknown', complete: false });
+  });
   it('filters closed and unknown-hours places when openNow is requested', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ places: [
       { id: 'open', displayName: { text: 'Open cafe' }, currentOpeningHours: { openNow: true } },
