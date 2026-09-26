@@ -7,6 +7,7 @@ const envSchema = z.object({
   FRONTEND_ORIGINS: z.string().default('http://localhost:5173,http://localhost:3000'),
   GOOGLE_MAPS_API_KEY: z.string().default(''), GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().regex(/^[a-zA-Z0-9._-]+$/).default('gemini-3.8-flash'),
+  GEMINI_FALLBACK_MODEL: z.string().regex(/^[a-zA-Z0-9._-]*$/).default('gemini-2.5-flash'),
   ENABLE_MAPS_GROUNDING: z.enum(['true', 'false']).default('false'),
   PROVIDER_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(12000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1000).default(30),

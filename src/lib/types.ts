@@ -1,7 +1,6 @@
-/** Single source of truth: backend/shared/contracts.ts. Use type-only imports. */
+/** Frontend flow contract from the team's guide. Provider contracts remain internal. */
 export type {
-  TripRequest, TripInput, TripResponse, NearbyRequest, NearbyResponse,
-  Location, Coordinates, Mode, Route, Place,
-} from "../../backend/shared/contracts";
-// Convenient UI aliases; these refer to the backend types, not separate definitions.
-export type { TripResponse as TripPlan, Route as RouteOption } from "../../backend/shared/contracts";
+  TripRequest, FinalTripRequest, StopCategory, StopPreferences, SuggestedStop,
+  RouteOption, TripPlan, SuggestStopsResponse,
+} from '../../backend/shared/flow-contracts';
+export type { Coordinates, Location, NearbyRequest, NearbyResponse } from '../../backend/shared/contracts';

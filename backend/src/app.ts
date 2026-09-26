@@ -11,8 +11,15 @@ import { AppError, Planner, type AiProvider, type MobilityProvider } from './pla
 import { campusPresets, demoWarning } from './providers/demo.js';
 import { ProviderError } from './providers/http.js';
 import { nearbyRequestSchema, nearbyResponseSchema, searchRequestSchema, tripRequestSchema, tripResponseSchema } from '../shared/contracts.js';
+import { finalTripRequestSchema, flowPlanSchema, suggestionsSchema } from '../shared/flow-contracts.js';
+import { FlowPlanner } from './flow.js';
 
 function json(schema: z.ZodType, io: 'input' | 'output' = 'input') { return z.toJSONSchema(schema, { target: 'draft-7', io }); }
+function output<T>(schema: z.ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new AppError(500, 'INVALID_PROVIDER_RESULT', 'The itinerary could not be validated. Retry or change the trip.');
+  return parsed.data;
+}
 export async function buildApp(config: Config = readConfig(), deps: { mobility?: MobilityProvider; ai?: AiProvider | null; logger?: boolean } = {}) {
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: 16384, logController: new LogController({ disableRequestLogging: true }),
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false, useDefaults: false } },
@@ -44,10 +51,13 @@ export async function buildApp(config: Config = readConfig(), deps: { mobility?:
     reply.status(status).send({ error: { code, message, requestId: request.id } });
   });
   const planner = new Planner(config, deps);
+  const flow = new FlowPlanner(config, deps);
   const security = config.API_ACCESS_TOKEN ? [{ bearerAuth: [] }] : [];
+  app.post('/api/suggest-stops', { schema: { tags: ['Frontend flow'], summary: 'Prepare trip, time-aware categories, and optional verified stops', security, body: json(finalTripRequestSchema), response: { 200: json(suggestionsSchema, 'output') } } }, async request => output(suggestionsSchema, await flow.suggest(request.body)));
+  app.post('/api/plan-trip', { schema: { tags: ['Frontend flow'], summary: 'Skip or add a stop, then return Best/Fastest/Cheapest cards', security, body: json(finalTripRequestSchema), response: { 200: json(flowPlanSchema, 'output') } } }, async request => output(flowPlanSchema, await flow.plan(request.body)));
   app.get('/', async (_, reply) => reply.redirect('/docs'));
   app.get('/health', { schema: { tags: ['System'], summary: 'Service and configuration status; does not call providers' } }, async () => ({
-    status: 'ok', dataMode: config.DATA_MODE, integrations: {
+    status: 'ok', service: 'routewise', flowVersion: 1, dataMode: config.DATA_MODE, integrations: {
       googleMaps: config.GOOGLE_MAPS_API_KEY ? 'configured_not_verified' : 'not_configured',
       gemini: config.GEMINI_API_KEY ? 'configured_not_verified' : 'not_configured',
     },

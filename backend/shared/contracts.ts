@@ -10,11 +10,15 @@ export const locationSchema = z.union([
   coordinatesSchema,
 ]);
 export const modeSchema = z.enum(['TRANSIT', 'DRIVE', 'WALK', 'BICYCLE']);
-export const categorySchema = z.enum(['food', 'coffee', 'parking', 'gas', 'ev_charging', 'pharmacy']);
+export const categorySchema = z.enum(['food', 'coffee', 'parking', 'gas', 'ev_charging', 'pharmacy', 'groceries', 'dessert']);
 export const tripRequestSchema = z.object({
   origin: locationSchema,
   destination: locationSchema,
   arrivalTime: z.iso.datetime({ offset: true }).optional(),
+  departureTime: z.iso.datetime({ offset: true }).optional(),
+  allowTransit: z.boolean().default(true),
+  allowWalking: z.boolean().default(true),
+  notes: z.string().trim().max(1000).default(''),
   hasCar: z.boolean().default(false),
   hasBike: z.boolean().default(false),
   budgetUsd: z.number().min(0).max(1000).default(15),
@@ -67,6 +71,15 @@ export const placeSchema = z.object({
   id: z.string(), name: z.string(), address: z.string(),
   location: coordinatesSchema.nullable(), mapsUrl: z.string().nullable(),
   openNow: z.boolean().nullable(), priceLevel: z.string().nullable(),
+  rating: z.number().optional(),
+  types: z.array(z.string()).optional(),
+  businessStatus: z.string().optional(),
+  utcOffsetMinutes: z.number().optional(),
+  priceRange: z.object({ low: z.number().nonnegative(), high: z.number().nonnegative(), currency: z.string() }).optional(),
+  openingPeriods: z.array(z.object({
+    open: z.object({ day: z.number().optional(), hour: z.number().optional(), minute: z.number().optional(), date: z.object({ year: z.number(), month: z.number(), day: z.number() }).optional() }),
+    close: z.object({ day: z.number().optional(), hour: z.number().optional(), minute: z.number().optional(), date: z.object({ year: z.number(), month: z.number(), day: z.number() }).optional() }).optional(),
+  })).optional(),
   attributions: z.array(z.object({ provider: z.string(), providerUri: z.string().nullable() })),
 });
 export const nearbyResponseSchema = z.object({

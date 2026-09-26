@@ -55,7 +55,7 @@ describe('provider protocol and normalization', () => {
     ] }));
     const places = await new GoogleProvider(config, fetcher).nearby({ location: { latitude: 25.8, longitude: -80.2 }, category: 'coffee', radiusMeters: 800, openNow: true });
     expect(places.map(p => p.id)).toEqual(['open']);
-    expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string).includedTypes).toEqual(['cafe']);
+    expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string).includedTypes).toEqual(['cafe', 'coffee_shop']);
   });
   it('rejects malformed provider data', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ routes: [{ duration: 'not-a-duration' }] }));
@@ -85,5 +85,15 @@ describe('provider protocol and normalization', () => {
     expect(result.groundingMetadata).toEqual(metadata);
     const body = JSON.parse(fetcher.mock.calls[0][1]!.body as string);
     expect(body.tools).toEqual([{ googleMaps: {} }]); expect(body).not.toHaveProperty('generationConfig');
+  });
+  it('tries the fallback Gemini model after a transient failure', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response('busy', { status: 503 })).mockResolvedValueOnce(response({ candidates: [{ content: { parts: [{ text: '{"categories":["coffee","food","gas","pharmacy"]}' }] } }] }));
+    expect(await new GeminiProvider(config, fetcher).categories(9, '')).toHaveLength(4);
+    expect(String(fetcher.mock.calls[1][0])).toContain(config.GEMINI_FALLBACK_MODEL);
+  });
+  it('does not invent a zero place price when monetary amounts are missing', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ id: 'example', displayName: { text: 'Cafe' }, priceRange: { startPrice: { currencyCode: 'USD' }, endPrice: { currencyCode: 'USD' } } }));
+    expect((await new GoogleProvider(config, fetcher).details('example')).priceRange).toBeUndefined();
+    expect(fetcher.mock.calls[0][1]?.method).toBeUndefined();
   });
 });

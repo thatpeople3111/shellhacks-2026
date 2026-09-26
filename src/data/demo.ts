@@ -1,10 +1,11 @@
 import type { TripRequest } from "@/lib/types";
 export const demoTripRequest: TripRequest = {
-  origin: { address: "FIU Modesto A. Maidique Campus, Miami, FL" },
-  destination: { address: "Wynwood Walls, Miami, FL" },
-  budgetUsd: 15,
+  origin: "FIU Modesto A. Maidique Campus, Miami, FL",
+  destination: "Wynwood Walls, Miami, FL",
+  budget: 15,
   maxWalkingMinutes: 10,
   hasCar: true,
   preference: "balanced",
-  nearbyCategories: ["food"],
+  allowTransit: true,
+  allowWalking: true,
 };

@@ -9,10 +9,13 @@ export interface MobilityProvider {
   routes(input: TripInput, mode: Mode): Promise<Route[]>;
   nearby(input: NearbyInput): Promise<Place[]>;
   search(query: string): Promise<Place[]>;
+  details?(id: string): Promise<Place>;
 }
 export interface AiProvider {
   choose: GeminiProvider['choose'];
   groundedPlaces: GeminiProvider['groundedPlaces'];
+  categories?: GeminiProvider['categories'];
+  rankStops?: GeminiProvider['rankStops'];
 }
 export class AppError extends Error {
   constructor(public statusCode: number, public code: string, message: string) { super(message); }
@@ -22,7 +25,7 @@ export function evaluate(route: Route, input: TripInput, now = Date.now()): Rout
   const walking = route.walkingMinutes === null ? 'unknown' : route.walkingMinutes <= input.maxWalkingMinutes ? 'met' : 'exceeded';
   let arrival: Route['constraints']['arrival'] = 'not_requested';
   // A transit itinerary that already departed cannot be recommended, even without an arrival deadline.
-  if (route.departureTime && Date.parse(route.departureTime) < now) arrival = 'missed';
+  if (route.mode === 'TRANSIT' && route.departureTime && Date.parse(route.departureTime) < now) arrival = 'missed';
   else if (input.arrivalTime) arrival = route.arrivalTime && route.departureTime
     ? Date.parse(route.arrivalTime) <= Date.parse(input.arrivalTime) ? 'met' : 'missed' : 'unknown';
   return { ...route, constraints: { budget, walking, arrival, eligible: budget === 'met' && walking === 'met' && (arrival === 'met' || arrival === 'not_requested') } };
@@ -46,14 +49,17 @@ export class Planner {
     this.mobility = deps.mobility ?? (config.DATA_MODE === 'demo' ? new DemoProvider() : new GoogleProvider(config));
     this.ai = deps.ai !== undefined ? deps.ai : config.DATA_MODE === 'live' && config.GEMINI_API_KEY ? new GeminiProvider(config) : null;
   }
-  async plan(input: TripInput): Promise<TripResponse> {
+  async plan(input: TripInput, options: { skipAi?: boolean } = {}): Promise<TripResponse> {
     const now = Date.now();
     if (input.arrivalTime) {
       const arrival = Date.parse(input.arrivalTime);
       if (arrival <= now || arrival > now + 7 * 86400000) throw new AppError(400, 'INVALID_ARRIVAL_TIME', 'Arrival time must be in the future and within seven days. Include a timezone offset or Z.');
     }
     const warnings: string[] = this.config.DATA_MODE === 'demo' ? [demoWarning] : [];
-    const modes: Mode[] = ['TRANSIT', 'WALK', ...(input.hasCar ? ['DRIVE' as const] : []), ...(input.hasBike ? ['BICYCLE' as const] : [])];
+    if (input.departureTime && (Date.parse(input.departureTime) < now - 60000 || Date.parse(input.departureTime) > now + 7 * 86400000))
+      throw new AppError(400, 'INVALID_DEPARTURE_TIME', 'Departure must be now or within seven days.');
+    const modes: Mode[] = [...(input.allowTransit ? ['TRANSIT' as const] : []), ...(input.allowWalking ? ['WALK' as const] : []), ...(input.hasCar ? ['DRIVE' as const] : []), ...(input.hasBike ? ['BICYCLE' as const] : [])];
+    if (!modes.length) throw new AppError(400, 'NO_TRANSPORT_MODES', 'Enable transit, walking, a car, or a bicycle.');
     const results = await Promise.allSettled(modes.map(m => this.mobility.routes(input, m)));
     const routes = results.flatMap((result, i) => {
       if (result.status === 'fulfilled') return result.value;
@@ -66,7 +72,7 @@ export class Planner {
     const candidates = (confirmed.length ? confirmed : possible).sort((a, b) => score(a, input.preference) - score(b, input.preference));
     let best = candidates[0] ?? null;
     let source: 'rules' | 'gemini' = 'rules';
-    if (best && this.ai) {
+    if (best && this.ai && !options.skipAi) {
       try {
         const chosen = await this.ai.choose(input, candidates);
         const match = candidates.find(r => r.id === chosen.routeId);
@@ -75,7 +81,7 @@ export class Planner {
         if (input.preference === 'balanced' || score(match, input.preference) === score(candidates[0], input.preference)) { best = match; source = 'gemini'; }
         else warnings.push('AI choice did not match the requested ranking; used rule-based ranking.');
       } catch { warnings.push('AI recommendation unavailable; used rule-based ranking.'); }
-    } else if (this.config.DATA_MODE === 'live' && !this.ai) warnings.push('Gemini is not configured; used rule-based ranking.');
+    } else if (this.config.DATA_MODE === 'live' && !this.ai && !options.skipAi) warnings.push('Gemini is not configured; used rule-based ranking.');
     if (!possible.length) warnings.push('No returned route meets the known limits. Adjust budget, walking limit, or arrival time.');
     if (!confirmed.length && possible.length) warnings.push('No route has all limits verified. The recommendation is provisional.');
     const pool = confirmed.length ? confirmed : possible;

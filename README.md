@@ -2,7 +2,9 @@
 
 One repository for both teammates: https://github.com/thatpeople3111/shellhacks-2026
 
-The Next.js frontend lives at the repository root; the existing standalone API lives in `backend/`. Backend history is preserved. The frontend is still the default Next.js starter and is not wired to the API yet.
+The Next.js frontend lives at the repository root; the Fastify API lives in `backend/`. The frontend now has `/api/suggest-stops` and `/api/plan-trip` server routes and a working `/backend-check` page for the complete optional-stop flow. The home page remains available for the frontend teammate's design.
+
+**Start here: [step-by-step guide and frontend contract](FLOW_GUIDE.md).** On this Windows computer, run `./Start-RouteWise.cmd` from the repository root, then open http://localhost:3000/backend-check. It starts both servers and reuses existing RouteWise instances.
 
 ## First-time setup (both people)
 
@@ -12,12 +14,13 @@ Use Node.js 24. Clone once, then open the folder in VS Code:
 git clone https://github.com/thatpeople3111/shellhacks-2026.git
 cd shellhacks-2026
 npm ci
-npm run dev
+npx --yes pnpm@11.25.0 --dir backend install --frozen-lockfile
+npm run dev:all
 ```
 
-Frontend: http://localhost:3000
+Frontend flow check: http://localhost:3000/backend-check
 
-In a second PowerShell terminal, start the existing backend in demo mode:
+For a separate backend-only terminal instead of the combined launcher:
 
 ```powershell
 cd backend
@@ -32,14 +35,16 @@ Demo mode does not require Google or Gemini keys.
 
 - `src/app/`: Next.js pages and layouts.
 - `src/components/`: reusable UI.
-- `src/lib/types.ts`: frontend import location, re-exporting the actual backend contract.
-- `backend/shared/contracts.ts`: single source of truth and runtime validation schemas.
+- `src/lib/types.ts`: frontend import location for `TripRequest`, `TripPlan`, and stop types.
+- `backend/shared/flow-contracts.ts`: flat request and card response schemas for the new flow.
+- `backend/shared/contracts.ts`: provider and legacy `/api/v1` schemas.
 - `src/data/demo.ts`: sample input matching that contract.
-- `backend/client/routewise.ts`: typed API client.
+- `src/lib/routewise.ts`: typed frontend helpers for the new flow.
+- `backend/client/routewise.ts`: legacy `/api/v1` client.
 - `backend/docs/FRONTEND.md`: integration and rendering requirements.
 
-Use `import type { TripRequest, TripResponse } from "@/lib/types"` in frontend code.
-Agree together before changing `backend/shared/contracts.ts`. Do not create incompatible duplicate request types.
+Use `import type { TripRequest, TripPlan } from "@/lib/types"` in frontend code.
+Agree together before changing shared contracts. Do not create incompatible duplicate request types.
 
 ## Branches and collaboration
 

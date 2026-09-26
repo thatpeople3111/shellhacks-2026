@@ -1,5 +1,9 @@
 # Frontend handoff
 
+**For the current optional-stop flow, use [FLOW_GUIDE.md](../../FLOW_GUIDE.md).** It documents the exact `/api/suggest-stops` → category/timing/limits → Skip/Add → `/api/plan-trip` integration. Import `suggestStops` and `planTrip` from `src/lib/routewise.ts` and types from `src/lib/types.ts`.
+
+The remaining examples below describe the retained legacy `/api/v1` API, whose request and response shapes differ. Do not mix them with the new frontend flow.
+
 Run the backend on `http://localhost:3001`. Use `GET /api/v1/config` to load campus presets. Interactive request schemas are at `/docs/`.
 
 ## React / Vite example
